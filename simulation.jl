@@ -56,11 +56,12 @@ function game_state_to_player_state(game_state, player_num)
         opp_board[i, :] = board_state[1 + mod(i + player_num - 1,4),:]
     end
     opp_board = clamp.(opp_board, 0, 1)
-    opp_state = 1
-    for i:length(opp_state)
-        opp_state +=
-    end
+    opp_state = sum(opp_board) # opp_state is just number of cards played
 
+    # to consider - should we add need number of cards in each opponents hand?
+    # otherwise how do we know when cards are taken out of game?
+
+    player_state = indiv_state + opp_state * 81 # 1296 possibilities
 end
 
 function simulate_move()
