@@ -62,16 +62,89 @@ function game_state_to_player_state(game_state, player_num)
     # otherwise how do we know when cards are taken out of game?
 
     player_state = indiv_state + opp_state * 81 # 1296 possibilities
+
+    return player_state
 end
 
-function simulate_move()
+function update_game_state(game_state, action, cur_turn)
+    """
+    Takes in a game_state, player and action and returns the new game_state
+    resulting from the action.
+
+    action 1: place flower
+    action 2: place skull
+    actions 3-14: place a bet of action - 2 (ie action 3 is betting 1)
+    action 15: start flipping
+    """
+
+    (board_state, hand_state) = game_state
+
+    if action == 1 # play flower
+
+        if hand_state[cur_turn, 1] < 1
+            @printf("Invalid action: Player does not have flower")
+        end
+
+        hand_state[cur_turn, 1] -= 1
+        board_state[cur_turn, findfirst(isequal(0), board_state[cur_turn, :])] = 1
+
+    elseif action == 2 # play skull
+
+        if hand_state[cur_turn, 2] < 1
+            @printf("Invalid action: Player does not have skull")
+        end
+
+        hand_state[cur_turn, 2] -= 1
+        board_state[cur_turn, findfirst(isequal(0), board_state[cur_turn, :])] = 2
+    end
+
+    game_state = (board_state, hand_state)
+    return game_state
 
 end
 
-function simulate_round(state, action, opp_policies)
+function simulate_to_next_turn(game_state, action, opp_policies, starting_player, phase)
     """
     Takes in player's state action as well as an array of opponent policies
     and simulates game up until the player's next turn. Array of opponent
     policies should be in turn order.
+
+    Starting player should be an int representing which player makes the first
+    move. If starting_player is not 1, then current player does not take an
+    action (action = 0).
+
+    Phase is int from 1 to 3. Phase 1 is playing, phase 2 is betting, phase 3 is
+    flipping.
     """
+
+    cur_turn = starting_player
+
+    while cur_turn <= num_players
+        player_state = game_state_to_player_state(game_state, cur_turn)
+        action = choose_opp_action(player_state)
+        game_state = update_game_state(game_state, action, cur_turn)
+
+        cur_turn += 1
+    end
+
+end
+
+function simulate_round(num_players, starting_player)
+
+    game_state = initialize_game(num_players) # players 2, 3, 4 are opponents
+    player_state = player_state(game_state, 1)
+
+    if starting_player != 1
+        action = 0 # don't choose action yet if oppenent is going first
+    else
+        action = choose_action(player_state)
+    end
+
+    results = simulate_to_next_turn()
+
+    while (round_not_over) # TODO figure out if round is over
+        action = choose_action(player_state)
+        results = simulate_to_next_turn()
+    end
+
 end
