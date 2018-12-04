@@ -42,7 +42,7 @@ function initialize_game(num_players)
     return game_state
 end
 
-function choose_action(player_state, phase, cur_bet, policy, passed)
+function choose_action(player_state, phase, cur_bet, policy, passed, cur_player)
     """
     action 1: place flower
     action 2: place skull
@@ -53,14 +53,15 @@ function choose_action(player_state, phase, cur_bet, policy, passed)
     if phase == 1 # playing phase: actions 1-14 are valid
         # note - we could alternatively just select from 3 actions if that's
         # easier
-        action = choose_playing_action(player_state)
+        action = choose_playing_action(player_state, policy)
         if action > 2 # if player decides to flip
             phase = 2 # move to flipping phase
         end
     elseif phase == 2 # betting phase: actions 3-15 are valid
         action = choose_betting_action(player_state, cur_bet)
     elseif phase == 3 # flipping phase
-        action = choose_flipping_action(player_state)
+        #this is redundant... I don't think we need this -Kaylee
+        action = choose_flipping_action(cur_player, )
         # will need to add some way of knowing which cards are left
     end
 
@@ -98,31 +99,6 @@ function update_game_state(game_state, action, cur_turn)
     game_state = (board_state, hand_state)
     return game_state
 
-end
-
-function choose_flipping_action(cur_turn, board_state)
-    """
-    Takes in board_state
-    Returns the player whose card will be flipped next
-    """
-    #if a player has cards in front of them, they must flip their own.
-    if board_state[cur_turn, 0] > 0
-        return cur_turn
-    end
-    #can choose any player it wants... probably want to do this as a beta or dirichlet..
-    #but for now it's random...
-    num_players = length(board_state)-1
-    else
-        #if we do not have proper checks to make sure there is definitely
-        #a player who has a card to flip, this could be infinite
-        while True
-            player = rand(0:num_players)
-            #we know this will never be true if the number is the current player
-            if board_state[player, 0] > 0
-                return player
-            end
-        end
-    end
 end
 
 function flip_cards(game_state, cur_turn, cur_bet)
@@ -187,7 +163,7 @@ function simulate_to_next_turn(game_state, action, opp_policies,
         end
         player_state = game_state_to_player_state(game_state, cur_turn)
         action = choose_action(player_state, phase, cur_bet, policy[cur_turn],
-            passed)
+            passed, cur_turn)
         if action == 1 || action == 2 # card-playing actions
             game_state = update_game_state(game_state, action, cur_turn)
         elseif action < 15 # betting action
@@ -201,7 +177,7 @@ function simulate_to_next_turn(game_state, action, opp_policies,
 
 end
 
-function simulate_round(num_players, starting_player)
+function simulate_round(num_players, starting_player, policy)
     """
     Simulates a full round of Skull. Each player starts with 4 cards. Any player
     can go first, but player 1 is always the one we are keeping track of (the
