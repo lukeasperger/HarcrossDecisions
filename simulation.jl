@@ -165,6 +165,10 @@ function simulate_to_next_turn(game_state, action, opp_policies,
         action = choose_action(player_state, phase, cur_bet, policy[cur_turn],
             passed, cur_turn)
         if action == 1 || action == 2 # card-playing actions
+            #perhaps based on the beta I suggested using for flipping,
+            #we should have some sort o indicator here maybe that tells us
+            #what card we think this is, bc for our betting strategy we need to
+            #know how many we think we could flip. -Kaylee
             game_state = update_game_state(game_state, action, cur_turn)
         elseif action < 15 # betting action
             cur_bet = action - 2
