@@ -23,7 +23,8 @@ function initialize_game(num_players)
     │Player 4│ 1      │ 0      │ 0      │ 0      │
 
     hand_state had dimensions num_players by 2 and represents the number of
-    flowers and skulls each player has. An example hand state is shown below
+    flowers and skulls each player has in possession at this phase in the game.
+    An example hand state is shown below
 
     │        │ Flowers │ Skulls │
     ├────────┼─────────┼────────┤
@@ -99,15 +100,56 @@ function update_game_state(game_state, action, cur_turn)
 
 end
 
+function choose_flipping_action(cur_turn, board_state)
+    """
+    Takes in board_state
+    Returns the player whose card will be flipped next
+    """
+    #if a player has cards in front of them, they must flip their own.
+    if board_state[cur_turn, 0] > 0
+        return cur_turn
+    end
+    #can choose any player it wants... probably want to do this as a beta or dirichlet..
+    #but for now it's random...
+    num_players = length(board_state)-1
+    else
+        #if we do not have proper checks to make sure there is definitely
+        #a player who has a card to flip, this could be infinite
+        while True
+            player = rand(0:num_players)
+            #we know this will never be true if the number is the current player
+            if board_state[player, 0] > 0
+                return player
+            end
+        end
+    end
+end
+
 function flip_cards(game_state, cur_turn, cur_bet)
+    """
+    Takes in a game_state, current player and the current bet.
+    The player will then choose which cards to flip until
+    they have met their bet or have gotten skulled.
+
+    Returns the current player as a positive number if they were successful
+        and the current player as a negative number if not.
+
+    """
     (board_state, hand_state) = game_state
+    #a boolean to determine whether or not the player flipping has seen a skull
+    #a player will have to flip over as many cards as they have guessed unless they see skull
+    skulled = False
     while (cur_bet > 0)
         player_state = game_state_to_player_state(game_state, cur_turn)
-        player_to_flip = choose_flipping_action(player_state)
+        player_to_flip = choose_flipping_action(cur_turn, board_state)
         ind = findlast(!isequal(0), board_state[player_to_flip, :])
+        #flipped a flower
         if board_state[player_to_flip, ind] == 1
+            board_state[player_to_flip, ind] = 0
             cur_bet -= 1
+        #flipped a skull
         else
+            board_state[player_to_flip, ind] = 0
             return -1 * cur_turn
         end
     end
@@ -137,6 +179,9 @@ function simulate_to_next_turn(game_state, action, opp_policies,
         if passed[cur_turn] == 1
             continue
         elseif sum(passed) == num_players - 1
+            #a player has won the bet and will flip cards to try and score a point
+            #if result is +, then the player scores,
+            #if result is -, then the player was not successful.
             result = flip_cards(game_state, cur_turn, cur_bet)
             break
         end
