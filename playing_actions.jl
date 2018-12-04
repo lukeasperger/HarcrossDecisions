@@ -23,21 +23,17 @@ function aggressive_play(skull, flowers)
             odds = rand(1:10)
             if odds == 1
                 return 2
-            end
             else
                 return 1
             end
-        end
         elseif flowers == 0
             #no flowers to play..
             return 2
-        end
         else
             #play skull at 50% odds.
             odds = rand(1:2)
             if odds  1
                 return 2
-            end
             else
                 return 1
             end
@@ -58,19 +54,16 @@ function random_play(skull, flowers)
             if flowers == 3
                 #first turn, have to play a card
                 move = rand(1:2)
-            end
             else
                 #both avail, or we can bet...
                 #choosing 5 arbitrarily.. means that our initial bet will always be 3
                 move = rand(1:5)
             end
             return move
-        end
         else
             #skull not available, prob don't wanna bet.
             return 1
         end
-    end
     else
         #no flowers, either bet or play skull ;)
         card = rand(2:5)
@@ -102,7 +95,6 @@ function flower_play(skull, flowers)
             end
         end
         return 1
-    end
     else
         #no flowers, either bet or play skull ;)
         card = rand(2:6)

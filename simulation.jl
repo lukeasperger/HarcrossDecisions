@@ -59,10 +59,10 @@ function choose_action(player_state, phase, cur_bet, policy, passed, cur_player)
             phase = 2 # move to flipping phase
         end
     elseif phase == 2 # betting phase: actions 3-15 are valid
-        action = choose_betting_action(player_state, cur_bet)
+        action = choose_betting_action(player_state, cur_bet) + 2
     elseif phase == 3 # flipping phase
         #this is redundant... I don't think we need this -Kaylee
-        action = choose_flipping_action(cur_player, )
+        action = choose_flipping_action(cur_player)
         # will need to add some way of knowing which cards are left
     end
 
@@ -134,10 +134,10 @@ function flip_cards(game_state, cur_turn, cur_bet)
     return cur_turn
 end
 
-function simulate_to_next_turn(game_state, action, opp_policies,
-    starting_player, phase, cur_bet)
+function simulate_to_next_turn(game_state, action, policies,
+    starting_player, phase, cur_bet, passed)
     """
-    Takes in player's state action as well as an array of opponent policies
+    Takes in player's state action as well as an array of policies
     and simulates game up until the player's next turn. Array of opponent
     policies should be in turn order.
 
@@ -163,8 +163,9 @@ function simulate_to_next_turn(game_state, action, opp_policies,
             break
         end
         player_state = game_state_to_player_state(game_state, cur_turn)
-        action = choose_action(player_state, phase, cur_bet, policy[cur_turn],
-            passed, cur_turn)
+        if cur_turn != 1
+            (action, phase) = choose_action(player_state, phase, cur_bet, policies[cur_turn], passed, cur_turn)
+        end
         if action == 1 || action == 2 # card-playing actions
             #perhaps based on the beta I suggested using for flipping,
             #we should have some sort o indicator here maybe that tells us
@@ -175,14 +176,14 @@ function simulate_to_next_turn(game_state, action, opp_policies,
             cur_bet = action - 2
         else # passed action
             passed[cur_turn] = 1
+        end
         cur_turn += 1
     end
 
-    return (game_state, phase, cur_bet, result)
-
+    return (game_state, phase, cur_bet, passed, result)
 end
 
-function simulate_round(num_players, starting_player, policy)
+function simulate_round(num_players, starting_player, policies)
     """
     Simulates a full round of Skull. Each player starts with 4 cards. Any player
     can go first, but player 1 is always the one we are keeping track of (the
@@ -194,7 +195,7 @@ function simulate_round(num_players, starting_player, policy)
 
     # Initialization
     game_state = initialize_game(num_players) # players 2, 3, 4 are opponents
-    player_state = player_state(game_state, 1)
+    player_state = game_state_to_player_state(game_state, 1)
     passed = zeros(Int64, num_players) # no players have passed yet
     phase = 1 # playing phase
     cur_bet = 0 # we are not in betting yet
@@ -202,16 +203,16 @@ function simulate_round(num_players, starting_player, policy)
     if starting_player != 1
         action = 0 # don't choose action yet if oppenent is going first
     else
-        (action, phase) = choose_action(player_state)
+        (action, phase) = choose_action(player_state, phase, cur_bet, policies[1], passed, starting_player)
     end
 
-    (game_state, phase, cur_bet, result) = simulate_to_next_turn()
+    (game_state, phase, cur_bet, result) = simulate_to_next_turn(game_state, action, policies, starting_player, phase, cur_bet)
 
     while (result == 0) # non-zero result means someone has won
 
         player_state = game_state_to_player_state(game_state, 1)
-        (action, phase) = choose_action(player_state, phase, policy)
-        (game_state, phase, cur_bet, result) = simulate_to_next_turn(game_state, phase)
+        (action, phase) = choose_action(player_state, phase, cur_bet, policies[1], passed, 1)
+        (game_state, phase, cur_bet, passed, result) = simulate_to_next_turn(game_state, phase)
 
         # TODO record whatever we need for model (ie. state, reward, transition)
     end
@@ -219,3 +220,8 @@ function simulate_round(num_players, starting_player, policy)
     return result
 
 end
+
+num_players = 4
+starting_player = 1
+policies = [1 0 1 2] # random, aggressive, random, flower
+simulate_round(num_players, starting_player, policies)
