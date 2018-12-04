@@ -58,12 +58,58 @@ function game_state_to_player_state(game_state, player_num)
     opp_board = clamp.(opp_board, 0, 1)
     opp_state = sum(opp_board) # opp_state is just number of cards played
 
-    # to consider - should we add need number of cards in each opponents hand?
-    # otherwise how do we know when cards are taken out of game?
-
     player_state = indiv_state + opp_state * 81 # 1296 possibilities
 
     return player_state
+end
+
+function player_state_as_tuple(player_state)
+    """
+    Puts the player state in a form that is easier to interpret. Returns an
+    array of the cards a player has placed on the board and also the total
+    number of cards played by the opponents.
+    """
+
+    opp_state = div(player_state, 3^4)
+    indiv_state = mod(player_state, 3^4)
+
+    cards = zeros(Int64, 4)
+    cards[1] = mod(indiv_state - 1, 3)
+    cards[2] = mod(div(indiv_state - 1, 3), 3)
+    cards[3] = mod(div(indiv_state - 1, 3^2), 3)
+    cards[4] = mod(div(indiv_state - 1, 3^3), 3)
+
+    return (cards, opp_state)
+
+end
+
+function choose_action(player_state, phase, cur_bet, policy)
+    """
+    action 1: place flower
+    action 2: place skull
+    actions 3-14: place a bet of action - 2 (ie action 3 is betting 1)
+    action 15-18: flip a card from player action - 14 (ie 16 is flip card
+        from player 2)
+    """
+
+    if phase == 1 # playing phase: actions 1-14 are valid
+        # note - we could alternatively just select from 3 actions if that's
+        # easier
+        action = choose_playing_action(player_state)
+        if action > 2 # if player decides to flip
+            phase = 2 # move to flipping phase
+        end
+    elseif phase == 2 # betting phase: actions 3-15 are valid
+        action = choose_betting_action(player_state, cur_bet)
+        if action == 15
+            phase = 3
+        end
+    elseif phase == 3 # flipping phase: actions 15-18 are valid
+        action = choose_flipping_action(player_state)
+        # will need to add some way of knowing which cards are left
+    end
+
+    return action
 end
 
 function update_game_state(game_state, action, cur_turn)
@@ -71,10 +117,6 @@ function update_game_state(game_state, action, cur_turn)
     Takes in a game_state, player and action and returns the new game_state
     resulting from the action.
 
-    action 1: place flower
-    action 2: place skull
-    actions 3-14: place a bet of action - 2 (ie action 3 is betting 1)
-    action 15: start flipping
     """
 
     (board_state, hand_state) = game_state
@@ -103,7 +145,8 @@ function update_game_state(game_state, action, cur_turn)
 
 end
 
-function simulate_to_next_turn(game_state, action, opp_policies, starting_player, phase)
+function simulate_to_next_turn(game_state, action, opp_policies,
+    starting_player, phase, cur_bet)
     """
     Takes in player's state action as well as an array of opponent policies
     and simulates game up until the player's next turn. Array of opponent
@@ -113,16 +156,18 @@ function simulate_to_next_turn(game_state, action, opp_policies, starting_player
     move. If starting_player is not 1, then current player does not take an
     action (action = 0).
 
-    Phase is int from 1 to 3. Phase 1 is playing, phase 2 is betting, phase 3 is
-    flipping.
+    Returns the state of the game
+
     """
 
     cur_turn = starting_player
 
     while cur_turn <= num_players
         player_state = game_state_to_player_state(game_state, cur_turn)
-        action = choose_opp_action(player_state)
-        game_state = update_game_state(game_state, action, cur_turn)
+        action = choose_action(player_state, phase, cur_bet, policy)
+        if action == 1 || action == 2 # card-playing actions
+            game_state = update_game_state(game_state, action, cur_turn)
+        else
 
         cur_turn += 1
     end
@@ -130,7 +175,12 @@ function simulate_to_next_turn(game_state, action, opp_policies, starting_player
 end
 
 function simulate_round(num_players, starting_player)
+    """
+    Phase is int from 1 to 3. Phase 1 is playing, phase 2 is betting, phase 3 is
+    flipping.
+    """
 
+    phase = 1 # playing phase
     game_state = initialize_game(num_players) # players 2, 3, 4 are opponents
     player_state = player_state(game_state, 1)
 
@@ -143,8 +193,11 @@ function simulate_round(num_players, starting_player)
     results = simulate_to_next_turn()
 
     while (round_not_over) # TODO figure out if round is over
-        action = choose_action(player_state)
-        results = simulate_to_next_turn()
+
+        player_state = game_state_to_player_state(game_state, 1)
+        (action, phase) = choose_action(player_state, phase, policy)
+        (game_state, phase, result) = simulate_to_next_turn(game_state, phase)
+
     end
 
 end
