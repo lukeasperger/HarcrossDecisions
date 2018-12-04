@@ -53,6 +53,7 @@ function choose_action(player_state, phase, cur_bet, policy, passed, cur_player)
     if phase == 1 # playing phase: actions 1-14 are valid
         # note - we could alternatively just select from 3 actions if that's
         # easier
+        #15 actions sound good. but we need to know how to transition from playing to betting
         action = choose_playing_action(player_state, policy)
         if action > 2 # if player decides to flip
             phase = 2 # move to flipping phase

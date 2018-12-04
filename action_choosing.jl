@@ -6,15 +6,29 @@ function choose_playing_action(player_state, policy)
     """
     Takes in the state of a player's hand and their policy
     Returns the card they are playing
+
+    Currently, this is assuming they always will play. Need to know when to transition to betting mode.
     """
+    cards, opp_state = player_state_as_tuple(player_state)
+    skull = 1
+    flowers = 3
+    for i in 1:4
+        #the skull has already been played
+        if cards[i] == 2
+            skull -= 1
+        end
+        if cards[i] == 1
+            flower -= 1
+        end
+    end
     if policy == 0:
-        return aggressive_play(player_state)
+        return aggressive_play(skull, flowers)
     end
     elif policy == 1:
-        return random_play(player_state)
+        return random_play(skull, flowers)
     end
     elif policy == 2:
-        return flower_play(player_state)
+        return flower_play(skull, flowers)
     end
 end
 
