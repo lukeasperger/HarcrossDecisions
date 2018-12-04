@@ -41,13 +41,12 @@ function initialize_game(num_players)
     return game_state
 end
 
-function choose_action(player_state, phase, cur_bet, policy)
+function choose_action(player_state, phase, cur_bet, policy, passed)
     """
     action 1: place flower
     action 2: place skull
     actions 3-14: place a bet of action - 2 (ie action 3 is betting 1)
-    action 15-18: flip a card from player action - 14 (ie 16 is flip card
-        from player 2)
+    action 15: pass
     """
 
     if phase == 1 # playing phase: actions 1-14 are valid
@@ -59,15 +58,12 @@ function choose_action(player_state, phase, cur_bet, policy)
         end
     elseif phase == 2 # betting phase: actions 3-15 are valid
         action = choose_betting_action(player_state, cur_bet)
-        if action == 15
-            phase = 3
-        end
-    elseif phase == 3 # flipping phase: actions 15-18 are valid
+    elseif phase == 3 # flipping phase
         action = choose_flipping_action(player_state)
         # will need to add some way of knowing which cards are left
     end
 
-    return action
+    return (action, phase)
 end
 
 function update_game_state(game_state, action, cur_turn)
@@ -103,6 +99,22 @@ function update_game_state(game_state, action, cur_turn)
 
 end
 
+function flip_cards(game_state, cur_turn, cur_bet)
+    (board_state, hand_state) = game_state
+    while (cur_bet > 0)
+        player_state = game_state_to_player_state(game_state, cur_turn)
+        player_to_flip = choose_flipping_action(player_state)
+        ind = findlast(!isequal(0), board_state[player_to_flip, :])
+        if board_state[player_to_flip, ind] == 1
+            cur_bet -= 1
+        else
+            return -1 * cur_turn
+        end
+    end
+
+    return cur_turn
+end
+
 function simulate_to_next_turn(game_state, action, opp_policies,
     starting_player, phase, cur_bet)
     """
@@ -119,43 +131,65 @@ function simulate_to_next_turn(game_state, action, opp_policies,
     """
 
     cur_turn = starting_player
+    result = 0 # nobody has won yet
 
-    while cur_turn <= num_players
+    while cur_turn <= num_players && result == 0
+        if passed[cur_turn] == 1
+            continue
+        elseif sum(passed) == num_players - 1
+            result = flip_cards(game_state, cur_turn, cur_bet)
+            break
+        end
         player_state = game_state_to_player_state(game_state, cur_turn)
-        action = choose_action(player_state, phase, cur_bet, policy)
+        action = choose_action(player_state, phase, cur_bet, policy[cur_turn],
+            passed)
         if action == 1 || action == 2 # card-playing actions
             game_state = update_game_state(game_state, action, cur_turn)
-        else
-
+        elseif action < 15 # betting action
+            cur_bet = action - 2
+        else # passed action
+            passed[cur_turn] = 1
         cur_turn += 1
     end
+
+    return (game_state, phase, cur_bet, result)
 
 end
 
 function simulate_round(num_players, starting_player)
     """
+    Simulates a full round of Skull. Each player starts with 4 cards. Any player
+    can go first, but player 1 is always the one we are keeping track of (the
+    one learning) and the rest are opponents.
+
     Phase is int from 1 to 3. Phase 1 is playing, phase 2 is betting, phase 3 is
     flipping.
     """
 
-    phase = 1 # playing phase
+    # Initialization
     game_state = initialize_game(num_players) # players 2, 3, 4 are opponents
     player_state = player_state(game_state, 1)
+    passed = zeros(Int64, num_players) # no players have passed yet
+    phase = 1 # playing phase
+    cur_bet = 0 # we are not in betting yet
 
     if starting_player != 1
         action = 0 # don't choose action yet if oppenent is going first
     else
-        action = choose_action(player_state)
+        (action, phase) = choose_action(player_state)
     end
 
-    results = simulate_to_next_turn()
+    (game_state, phase, cur_bet, result) = simulate_to_next_turn()
 
-    while (round_not_over) # TODO figure out if round is over
+    while (result == 0) # non-zero result means someone has won
 
         player_state = game_state_to_player_state(game_state, 1)
         (action, phase) = choose_action(player_state, phase, policy)
-        (game_state, phase, result) = simulate_to_next_turn(game_state, phase)
+        (game_state, phase, cur_bet, result) = simulate_to_next_turn(game_state, phase)
 
+        # TODO record whatever we need for model (ie. state, reward, transition)
     end
+
+    return result
 
 end
