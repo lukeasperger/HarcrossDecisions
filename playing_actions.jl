@@ -32,7 +32,7 @@ function aggressive_play(skull, flowers)
         else
             #play skull at 50% odds.
             odds = rand(1:2)
-            if odds  1
+            if odds == 1
                 return 2
             else
                 return 1
