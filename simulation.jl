@@ -1,5 +1,7 @@
 using Printf
 using DataFrames
+using JSON
+
 include("action_choosing.jl")
 include("utils.jl")
 
@@ -75,6 +77,79 @@ function choose_action(player_state, phase, cur_bet, policy, passed, cur_player)
     return (action, phase)
 end
 
+function process_json()
+    #JSON.jl is trash so i had to process this json string manually :(
+    
+    data=JSON.parsefile("skull_Q.json")  
+    data = data[3:end-1]
+    d = split(data, """,\"""" )
+    values = []
+    dict = Dict()
+    for i in 1:length(d)
+        string = d[i]
+        right_paren = findfirst(")", string)
+        key = string[2:right_paren[1]-1]
+        keys = split(key, ",")
+        sa_pair = (parse(Int32, keys[1]),parse(Int32, keys[2][1:end]))
+        value = string[right_paren[1] + 3:end]
+        value = parse(Float64,value)
+        dict[sa_pair] = value
+    end
+    return dict  
+end
+
+
+function choose_model_action(player_state, phase, cur_bet, cur_player)
+     """
+    Chooses action based on optimal policies learned in Value Iteration that
+    are contained in Skull_Q.json
+    
+    action 1: place flower
+    action 2: place skull
+    actions 3-14: place a bet of action - 2 (ie action 3 is betting 1)
+    action 15: pass
+    """
+    dict = process_json()
+    max = -10 #impossible to go below, used as initial threshold for action selection 
+    if phase == 1 # playing phase: actions 1-14 are valid
+        # note - we could alternatively just select from 3 actions if that's
+        # easier
+        #15 actions sound good. but we need to know how to transition from playing to betting
+        #action = choose_playing_action(player_state, policy)
+        for key in dict.keys()
+            if player_state in key
+                if key[1] < 15 && dict[key] > max
+                    max = dict[key]
+                    action = key[1]
+                end
+            end
+        end 
+        if action > 2 # if player decides to flip
+            phase = 2 # move to flipping phase
+            @printf("Player %d bets %d\n", cur_player, action - 2)
+        end
+    elseif phase == 2 # betting phase: actions 3-15 are valid
+        for key in dict.keys()
+            if player_state in key
+                if key[1] > 3 && key[1] < 16 && dict[key] > max
+                    max = dict[key]
+                    action = key[1]
+                end
+            end
+        end 
+        if action != 15
+            @printf("Player %d bets %d\n", cur_player, action - 2)
+        else
+            @printf("Player %d passes\n", cur_player)
+        end
+    elseif phase == 3 # flipping phase
+        #this is redundant... I don't think we need this -Kaylee
+        action = choose_flipping_action(cur_player)
+        # will need to add some way of knowing which cards are left
+    end
+    return (action, phase)
+end 
+    
 function update_game_state(game_state, action, cur_turn)
     """
     Takes in a game_state, player and action and returns the new game_state
@@ -227,11 +302,10 @@ function simulate_round(num_players, starting_player, policies, filename)
     cur_bet = 0 # we are not in betting yet
     @printf("Starting game: Player %d is first\n", starting_player)
     reward = 0
-
     if starting_player != 1
         action = 0 # don't choose action yet if oppenent is going first
     else
-        (action, phase) = choose_action(player_state, phase, cur_bet, policies[1], passed, starting_player)
+        (action, phase) = choose_model_action(player_state, phase, cur_bet, starting_player)
     end
 
     (game_state, phase, cur_bet, passed, result) = simulate_to_next_turn(game_state, action, policies, starting_player, phase, cur_bet, passed)
@@ -245,10 +319,9 @@ function simulate_round(num_players, starting_player, policies, filename)
     end
 
     while result == 0 # non-zero result means someone has won
-
         player_state = game_state_to_player_state(game_state, 1)
         if passed[1] == 0
-            (action, phase) = choose_action(player_state, phase, cur_bet, policies[1], passed, 1)
+            (action, phase) = choose_model_action(player_state, phase, cur_bet, 1)
         else
             action = 0
         end
