@@ -194,7 +194,22 @@ function simulate_to_next_turn(game_state, action, policies, starting_player, ph
     return (game_state, phase, cur_bet, passed, result)
 end
 
-function simulate_round(num_players, starting_player, policies)
+function result_to_reward(result)
+    # parse result into rewards
+    if result == 0 # game still going
+        reward = 0
+    elseif result > 1 # opponent wins
+        reward = -4
+    elseif result == 1 # player wins
+        reward = 5
+    elseif result == -1 # player loses card
+        reward = -2
+    else # opponent loses card
+        reward = 1
+    end
+end
+
+function simulate_round(num_players, starting_player, policies, filename)
     """
     Simulates a full round of Skull. Each player starts with 4 cards. Any player
     can go first, but player 1 is always the one we are keeping track of (the
@@ -211,6 +226,7 @@ function simulate_round(num_players, starting_player, policies)
     phase = 1 # playing phase
     cur_bet = 0 # we are not in betting yet
     @printf("Starting game: Player %d is first\n", starting_player)
+    reward = 0
 
     if starting_player != 1
         action = 0 # don't choose action yet if oppenent is going first
@@ -219,6 +235,14 @@ function simulate_round(num_players, starting_player, policies)
     end
 
     (game_state, phase, cur_bet, passed, result) = simulate_to_next_turn(game_state, action, policies, starting_player, phase, cur_bet, passed)
+
+    # record whatever we need for model (ie. state, reward, transition)
+    next_player_state = game_state_to_player_state(game_state, 1)
+    if action != 0
+        open(filename, "a") do io
+            @printf(io, "%d, %d, %d, %d\n", player_state, action, next_player_state, result_to_reward(result))
+        end
+    end
 
     while result == 0 # non-zero result means someone has won
 
@@ -230,25 +254,22 @@ function simulate_round(num_players, starting_player, policies)
         end
         (game_state, phase, cur_bet, passed, result) = simulate_to_next_turn(game_state, action, policies, starting_player, phase, cur_bet, passed)
 
-        # TODO record whatever we need for model (ie. state, reward, transition)
-    end
-
-    # parse result into rewards
-
-    if result > 1 # opponent wins
-        reward = -4
-    elseif result == 1 # player wins
-        reward = 5
-    elseif result == -1 # player loses card
-        reward = -2
-    else # opponent loses card
-        reward = 1
+        # record whatever we need for model (ie. state, reward, transition)
+        next_player_state = game_state_to_player_state(game_state, 1)
+        reward = result_to_reward(result)
+        open(filename, "a") do io
+            @printf(io, "%d, %d, %d, %d\n", player_state, action, next_player_state, reward)
+        end
     end
 
     @printf("Player 1's reward is %d\n\n", reward)
     return reward
 end
 
+filename = ("test.txt")
+
 num_players = 4
 starting_player = 1
 policies = [1 0 1 2] # random, aggressive, random, flower
+
+reward = simulate_round(num_players, starting_player, policies, filename)
