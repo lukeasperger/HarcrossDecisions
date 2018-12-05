@@ -57,12 +57,18 @@ function choose_action(player_state, phase, cur_bet, policy, passed, cur_player)
         action = choose_playing_action(player_state, policy)
         if action > 2 # if player decides to flip
             phase = 2 # move to flipping phase
+            @printf("Player %d bets %d\n", cur_player, action - 2)
         end
     elseif phase == 2 # betting phase: actions 3-15 are valid
-        action = choose_betting_action(player_state, cur_bet, policy)
+        action = choose_betting_action(player_state, cur_bet) + 2
+        if action != 15
+            @printf("Player %d bets %d\n", cur_player, action - 2)
+        else
+            @printf("Player %d passes\n", cur_player)
+        end
     elseif phase == 3 # flipping phase
         #this is redundant... I don't think we need this -Kaylee
-        action = choose_flipping_action(cur_player, )
+        action = choose_flipping_action(cur_player)
         # will need to add some way of knowing which cards are left
     end
 
@@ -86,6 +92,7 @@ function update_game_state(game_state, action, cur_turn)
 
         hand_state[cur_turn, 1] -= 1
         board_state[cur_turn, findfirst(isequal(0), board_state[cur_turn, :])] = 1
+        @printf("Player %d places flower\n", cur_turn)
 
     elseif action == 2 # play skull
 
@@ -95,6 +102,7 @@ function update_game_state(game_state, action, cur_turn)
 
         hand_state[cur_turn, 2] -= 1
         board_state[cur_turn, findfirst(isequal(0), board_state[cur_turn, :])] = 2
+        @printf("Player %d places skull\n", cur_turn)
     end
 
     game_state = (board_state, hand_state)
@@ -115,7 +123,7 @@ function flip_cards(game_state, cur_turn, cur_bet)
     (board_state, hand_state) = game_state
     #a boolean to determine whether or not the player flipping has seen a skull
     #a player will have to flip over as many cards as they have guessed unless they see skull
-    skulled = False
+    skulled = false
     while (cur_bet > 0)
         player_state = game_state_to_player_state(game_state, cur_turn)
         player_to_flip = choose_flipping_action(cur_turn, board_state)
@@ -123,10 +131,12 @@ function flip_cards(game_state, cur_turn, cur_bet)
         #flipped a flower
         if board_state[player_to_flip, ind] == 1
             board_state[player_to_flip, ind] = 0
+            @printf("Player %d flips over player %d's flower\n", cur_turn, player_to_flip)
             cur_bet -= 1
         #flipped a skull
         else
             board_state[player_to_flip, ind] = 0
+            @printf("Player %d flips over player %d's skull\n", cur_turn, player_to_flip)
             return -1 * cur_turn
         end
     end
@@ -134,10 +144,9 @@ function flip_cards(game_state, cur_turn, cur_bet)
     return cur_turn
 end
 
-function simulate_to_next_turn(game_state, action, opp_policies,
-    starting_player, phase, cur_bet)
+function simulate_to_next_turn(game_state, action, policies, starting_player, phase, cur_bet, passed)
     """
-    Takes in player's state action as well as an array of opponent policies
+    Takes in player's state action as well as an array of policies
     and simulates game up until the player's next turn. Array of opponent
     policies should be in turn order.
 
@@ -154,17 +163,20 @@ function simulate_to_next_turn(game_state, action, opp_policies,
 
     while cur_turn <= num_players && result == 0
         if passed[cur_turn] == 1
+            cur_turn += 1
             continue
         elseif sum(passed) == num_players - 1
             #a player has won the bet and will flip cards to try and score a point
             #if result is +, then the player scores,
             #if result is -, then the player was not successful.
+            @printf("%d players have passed, player %d is flipping\n", sum(passed), cur_turn)
             result = flip_cards(game_state, cur_turn, cur_bet)
             break
         end
         player_state = game_state_to_player_state(game_state, cur_turn)
-        action = choose_action(player_state, phase, cur_bet, policy[cur_turn],
-            passed, cur_turn)
+        if cur_turn != 1
+            (action, phase) = choose_action(player_state, phase, cur_bet, policies[cur_turn], passed, cur_turn)
+        end
         if action == 1 || action == 2 # card-playing actions
             #perhaps based on the beta I suggested using for flipping,
             #we should have some sort o indicator here maybe that tells us
@@ -175,14 +187,29 @@ function simulate_to_next_turn(game_state, action, opp_policies,
             cur_bet = action - 2
         else # passed action
             passed[cur_turn] = 1
+        end
         cur_turn += 1
     end
 
-    return (game_state, phase, cur_bet, result)
-
+    return (game_state, phase, cur_bet, passed, result)
 end
 
-function simulate_round(num_players, starting_player, policy)
+function result_to_reward(result)
+    # parse result into rewards
+    if result == 0 # game still going
+        reward = 0
+    elseif result > 1 # opponent wins
+        reward = -4
+    elseif result == 1 # player wins
+        reward = 5
+    elseif result == -1 # player loses card
+        reward = -2
+    else # opponent loses card
+        reward = 1
+    end
+end
+
+function simulate_round(num_players, starting_player, policies, filename)
     """
     Simulates a full round of Skull. Each player starts with 4 cards. Any player
     can go first, but player 1 is always the one we are keeping track of (the
@@ -194,28 +221,61 @@ function simulate_round(num_players, starting_player, policy)
 
     # Initialization
     game_state = initialize_game(num_players) # players 2, 3, 4 are opponents
-    player_state = player_state(game_state, 1)
+    player_state = game_state_to_player_state(game_state, 1)
     passed = zeros(Int64, num_players) # no players have passed yet
     phase = 1 # playing phase
     cur_bet = 0 # we are not in betting yet
+    @printf("Starting game: Player %d is first\n", starting_player)
+    reward = 0
 
     if starting_player != 1
         action = 0 # don't choose action yet if oppenent is going first
     else
-        (action, phase) = choose_action(player_state)
+        (action, phase) = choose_action(player_state, phase, cur_bet, policies[1], passed, starting_player)
     end
 
-    (game_state, phase, cur_bet, result) = simulate_to_next_turn()
+    (game_state, phase, cur_bet, passed, result) = simulate_to_next_turn(game_state, action, policies, starting_player, phase, cur_bet, passed)
 
-    while (result == 0) # non-zero result means someone has won
+    # record whatever we need for model (ie. state, reward, transition)
+    next_player_state = game_state_to_player_state(game_state, 1)
+    if action != 0
+        open(filename, "a") do io
+            @printf(io, "%d, %d, %d, %d\n", player_state, action, next_player_state, result_to_reward(result))
+        end
+    end
+
+    while result == 0 # non-zero result means someone has won
 
         player_state = game_state_to_player_state(game_state, 1)
-        (action, phase) = choose_action(player_state, phase, policy)
-        (game_state, phase, cur_bet, result) = simulate_to_next_turn(game_state, phase)
+        if passed[1] == 0
+            (action, phase) = choose_action(player_state, phase, cur_bet, policies[1], passed, 1)
+        else
+            action = 0
+        end
+        (game_state, phase, cur_bet, passed, result) = simulate_to_next_turn(game_state, action, policies, 1, phase, cur_bet, passed)
 
-        # TODO record whatever we need for model (ie. state, reward, transition)
+        # record whatever we need for model (ie. state, reward, transition)
+        next_player_state = game_state_to_player_state(game_state, 1)
+        reward = result_to_reward(result)
+        open(filename, "a") do io
+            @printf(io, "%d, %d, %d, %d\n", player_state, action, next_player_state, reward)
+        end
     end
 
-    return result
+    @printf("Player 1's reward is %d\n\n", reward)
+    return reward
+end
 
+filename = ("100000_rounds.txt")
+
+num_players = 4
+starting_player = 1
+policies = [1 0 1 2] # random, aggressive, random, flower
+
+for i in 1:100000
+    for j in 1:4
+        policies[j] = rand(0:2)
+    end
+    starting_player = rand(1:4)
+    simulate_round(num_players, starting_player, policies, filename)
 end

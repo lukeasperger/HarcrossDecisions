@@ -1,6 +1,7 @@
 using Printf
 using DataFrames
 include("utils.jl")
+include("playing_actions.jl")
 
 function choose_playing_action(player_state, policy)
     """
@@ -18,16 +19,14 @@ function choose_playing_action(player_state, policy)
             skull -= 1
         end
         if cards[i] == 1
-            flower -= 1
+            flowers -= 1
         end
     end
-    if policy == 0:
+    if policy == 0
         return aggressive_play(skull, flowers)
-    end
-    elif policy == 1:
+    elseif policy == 1
         return random_play(skull, flowers)
-    end
-    elif policy == 2:
+    elseif policy == 2
         return flower_play(skull, flowers)
     end
 end
@@ -47,12 +46,20 @@ function choose_betting_action(player_state, cur_bet, policy)
     end
     if skull == true
         #pass almost all the time..
-        return 15
+        return 13
     end
 
     #choose to increase bet
     #todo, this is a bad strategy... we need to have some number that is telling us how many we think we can get..
     #so like if that number is 3 and the bet is at 3 we wouldn't want to increase
+
+    # add in check so we don't bet more than number of cards
+    num_cards_on_board = opp_state + findlast(!isequal(0), cards)
+    if cur_bet >= num_cards_on_board
+        return 13
+    end
+
+
     return cur_bet+1
 end
 
@@ -62,19 +69,22 @@ function choose_flipping_action(cur_turn, board_state)
     Returns the player whose card will be flipped next
     """
     #if a player has cards in front of them, they must flip their own.
-    if board_state[cur_turn, 0] > 0
+    if board_state[cur_turn, 1] > 0
         return cur_turn
-    end
-    #can choose any player it wants... probably want to do this as a beta or dirichlet..
-    #but for now it's random...
-    num_players = length(board_state)-1
     else
+        #can choose any player it wants... probably want to do this as a beta or dirichlet..
+        #but for now it's random...
+        num_players = 4
+
         #if we do not have proper checks to make sure there is definitely
         #a player who has a card to flip, this could be infinite
-        while True
-            player = rand(0:num_players)
+        while true
+            if count(!iszero(board_state)) == 0
+                @printf("Something is wrong, board empty before all cards flipped\n")
+            end
+            player = rand(1:num_players)
             #we know this will never be true if the number is the current player
-            if board_state[player, 0] > 0
+            if board_state[player, 1] > 0
                 return player
             end
         end
