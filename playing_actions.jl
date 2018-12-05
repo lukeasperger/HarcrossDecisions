@@ -37,8 +37,11 @@ function aggressive_play(skull, flowers)
             else
                 return 1
             end
-    end
+        end
     else
+        if flowers == 0
+            return 4
+        end
         odds = rand(1:20)
         if odds == 1
             #bet 2 with 5% likelihood
@@ -65,9 +68,13 @@ function random_play(skull, flowers)
             return 1
         end
     else
-        #no flowers, either bet or play skull ;)
-        card = rand(2:5)
-        return card
+        if skull > 0
+            #no flowers, either bet or play skull ;)
+            card = rand(2:5)
+            return card
+        else
+            return rand(3:5)
+        end
     end
 end
 
@@ -95,7 +102,7 @@ function flower_play(skull, flowers)
             end
         end
         return 1
-    else
+    elseif skull > 0
         #no flowers, either bet or play skull ;)
         card = rand(2:6)
         if card == 2
@@ -108,5 +115,7 @@ function flower_play(skull, flowers)
             card += 1
         end
         return card
+    else
+        return rand(3:6)
     end
 end
