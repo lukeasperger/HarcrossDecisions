@@ -59,7 +59,7 @@ function choose_action(player_state, phase, cur_bet, policy, passed, cur_player)
             phase = 2 # move to flipping phase
         end
     elseif phase == 2 # betting phase: actions 3-15 are valid
-        action = choose_betting_action(player_state, cur_bet)
+        action = choose_betting_action(player_state, cur_bet, policy)
     elseif phase == 3 # flipping phase
         #this is redundant... I don't think we need this -Kaylee
         action = choose_flipping_action(cur_player, )

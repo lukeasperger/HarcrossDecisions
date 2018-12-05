@@ -32,7 +32,7 @@ function choose_playing_action(player_state, policy)
     end
 end
 
-function choose_betting_action(player_state, cur_bet)
+function choose_betting_action(player_state, cur_bet, policy)
     #2 optons: pass or increase
     # There are two main reasons a player would want to pass.
     # They have laid down a skull so they **know** they can't be successful
@@ -49,6 +49,7 @@ function choose_betting_action(player_state, cur_bet)
         #pass almost all the time..
         return 15
     end
+
     #choose to increase bet
     #todo, this is a bad strategy... we need to have some number that is telling us how many we think we can get..
     #so like if that number is 3 and the bet is at 3 we wouldn't want to increase
