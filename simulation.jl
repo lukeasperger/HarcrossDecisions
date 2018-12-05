@@ -252,7 +252,7 @@ function simulate_round(num_players, starting_player, policies, filename)
         else
             action = 0
         end
-        (game_state, phase, cur_bet, passed, result) = simulate_to_next_turn(game_state, action, policies, starting_player, phase, cur_bet, passed)
+        (game_state, phase, cur_bet, passed, result) = simulate_to_next_turn(game_state, action, policies, 1, phase, cur_bet, passed)
 
         # record whatever we need for model (ie. state, reward, transition)
         next_player_state = game_state_to_player_state(game_state, 1)
@@ -266,10 +266,16 @@ function simulate_round(num_players, starting_player, policies, filename)
     return reward
 end
 
-filename = ("test.txt")
+filename = ("1000_rounds.txt")
 
 num_players = 4
 starting_player = 1
 policies = [1 0 1 2] # random, aggressive, random, flower
 
-reward = simulate_round(num_players, starting_player, policies, filename)
+for i in 1:1000
+    for j in 1:4
+        policies[j] = rand(0:2)
+    end
+    starting_player = rand(1:4)
+    simulate_round(num_players, starting_player, policies, filename)
+end
