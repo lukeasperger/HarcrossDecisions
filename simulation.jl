@@ -288,7 +288,7 @@ function result_to_reward(result)
     end
 end
 
-function simulate_round(num_players, starting_player, policies, filename)
+function simulate_round(num_players, starting_player, policies, filename, beta_flips)
     """
     Simulates a full round of Skull. Each player starts with 4 cards. Any player
     can go first, but player 1 is always the one we are keeping track of (the
@@ -364,7 +364,7 @@ beta_flips = [1 for r in 1:num_players, c in 1:2]
 reward_sum = 0
 for i in 1:100
     starting_player = rand(1:4)
-    reward = simulate_round(num_players, starting_player, policies, filename)
+    reward = simulate_round(num_players, starting_player, policies, filename, beta_flips)
     global reward_sum += reward
 end
 
