@@ -69,7 +69,7 @@ function choose_betting_action(player_state, cur_bet)
     return cur_bet+1
 end
 
-function choose_flipping_action(cur_turn, board_state)
+function choose_flipping_action(cur_turn, board_state, beta_flips)
     """
     Takes in board_state
     Returns the player whose card will be flipped next
@@ -81,18 +81,41 @@ function choose_flipping_action(cur_turn, board_state)
         #can choose any player it wants... probably want to do this as a beta or dirichlet..
         #but for now it's random...
         num_players = 4
-
+        exp = [0.0 for r in 1:4]
         #if we do not have proper checks to make sure there is definitely
         #a player who has a card to flip, this could be infinite
-        while true
-            if count(!iszero(board_state)) == 0
-                @printf("Something is wrong, board empty before all cards flipped\n")
-            end
-            player = rand(1:num_players)
-            #we know this will never be true if the number is the current player
-            if board_state[player, 1] > 0
-                return player
+        if count(!iszero(board_state)) == 0
+            @printf("Something is wrong, board empty before all cards flipped\n")
+            return -1
+        end
+        for i in 1:num_players
+            if i != cur_turn
+                alpha = beta_flips[i,1]
+                beta = beta_flips[i,2]
+                expectation = alpha/(alpha+beta)
+                exp[i] = expectation
             end
         end
+        for i in 1:num_players-1
+            maxval = maximum(exp)
+            player = cur_turn
+            for (i,x) in enumerate(exp)
+                if x == maxval
+                    player = i
+                    break
+                end
+            end
+            # player = [i for (i, x) in enumerate(exp) if x == maxval]
+            #we know this will never be true if the number is the current player
+            opponent_stack = board_state[player, 1]
+            if opponent_stack[1] > 0
+                print("Chose player to flip")
+                print(player[1])
+                return player
+            end
+            exp[player] = 0.0
+        end
+        @printf("Something is wrong, board empty before all cards flipped\n")
+        return -1
     end
 end
