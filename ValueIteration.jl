@@ -2,11 +2,13 @@
 using Printf
 using DataFrames
 using CSV
-using SpecialFunctions 
+using SpecialFunctions
 using Random
 using SparseArrays
 using JSON
 
+
+#this file will produce dictionary of all the Q-values for state, action pairs
 function compute_policies(infile)
  
     discount = 0.95
@@ -39,12 +41,12 @@ function compute_policies(infile)
             N[(s,a,sp)] = N[(s,a,sp)] + 1
         else
             N[(s,a,sp)] = 1
-        end 
+        end
         if haskey(N_sums,(s,a))
             N_sums[(s,a)] = N_sums[(s,a)] + 1
         else
             N_sums[(s,a)] = 1
-        end 
+        end
         if haskey(reward,(s,a))
             reward[(s,a)] = reward[(s,a)] + r
         else
@@ -56,7 +58,7 @@ function compute_policies(infile)
         for ap in collect(1:4)
             if haskey(Q,(sp,ap))
                     val = Q[(sp,ap)]*T[(sp,s,a)]
-            else 
+            else
                     val = 0
             end
             if val > max
@@ -64,7 +66,7 @@ function compute_policies(infile)
             end
         end
         Q[(s,a)] = R[(s,a)] + discount*max #max_aiQ(sp,ap), iterate over actions Q(s',a'), 0 if action unseen
-    end  
+    end
     optimalPols = Dict()
     num_states = 1296
     num_actions = 15
@@ -72,10 +74,10 @@ function compute_policies(infile)
     open("skull_Q.json","w") do f
       JSON.print(f, json_string)
     end
-end 
+end
 
-inputfilename = "100000_rounds.CSV" 
-compute_policies(inputfilename)     
+inputfilename = "100000_rounds.CSV"
+compute_policies(inputfilename)
 
 
 
@@ -101,5 +103,3 @@ return dict
 for (key,value) in dict
     print(key, "==>", value)
 end
-
-
