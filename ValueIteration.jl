@@ -10,7 +10,6 @@ using JSON
 
 #this file will produce dictionary of all the Q-values for state, action pairs
 function compute_policies(infile)
- 
     discount = 0.95
     df = CSV.read(infile)
     s = df[1,1]

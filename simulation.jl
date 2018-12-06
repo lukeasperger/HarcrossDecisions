@@ -51,15 +51,14 @@ function choose_action(player_state, phase, cur_bet, policy, passed, cur_player)
     actions 3-14: place a bet of action - 2 (ie action 3 is betting 1)
     action 15: pass
     """
-    #@printf("phase is %d, curbet is %d, player state is %d\n", phase, cur_bet, player_state)
+
     if phase == 1 # playing phase: actions 1-14 are valid
         # note - we could alternatively just select from 3 actions if that's
         # easier
         #15 actions sound good. but we need to know how to transition from playing to betting
-        #@printf("action is %d\n", action)
         action = choose_playing_action(player_state, policy)
-        if action > 2 # if player decides to bet
-            phase = 2 # move to betting phase
+        if action > 2 # if player decides to flip
+            phase = 2 # move to flipping phase
             @printf("Player %d bets %d\n", cur_player, action - 2)
         end
     elseif phase == 2 # betting phase: actions 3-15 are valid
@@ -117,8 +116,7 @@ function choose_model_action(player_state, phase, cur_bet, cur_player)
         # easier
         #15 actions sound good. but we need to know how to transition from playing to betting
         #action = choose_playing_action(player_state, policy)
-        action = 3 # default if nothing better
-        for key in keys(dict)
+        for key in dict.keys()
             if player_state in key
                 if key[1] < 15 && dict[key] > max
                     max = dict[key]
@@ -126,14 +124,12 @@ function choose_model_action(player_state, phase, cur_bet, cur_player)
                 end
             end
         end
-        if action > 2 # if player decides to bet
-            phase = 2 # move to betting phase
+        if action > 2 # if player decides to flip
+            phase = 2 # move to flipping phase
             @printf("Player %d bets %d\n", cur_player, action - 2)
         end
     elseif phase == 2 # betting phase: actions 3-15 are valid
-        #@printf("phase = 2\n")
-        action = 15 # default to passing if nothing better
-        for key in keys(dict)
+        for key in dict.keys()
             if player_state in key
                 if key[1] > 3 && key[1] < 16 && dict[key] > max
                     max = dict[key]
@@ -288,7 +284,7 @@ function result_to_reward(result)
     end
 end
 
-function simulate_round(num_players, starting_player, policies, filename)
+function simulate_round(num_players, starting_player, policies, filename, beta_flips)
     """
     Simulates a full round of Skull. Each player starts with 4 cards. Any player
     can go first, but player 1 is always the one we are keeping track of (the
@@ -309,8 +305,7 @@ function simulate_round(num_players, starting_player, policies, filename)
     if starting_player != 1
         action = 0 # don't choose action yet if oppenent is going first
     else
-        #(action, phase) = choose_model_action(player_state, phase, cur_bet, starting_player)
-        (action, phase) = choose_action(player_state, phase, cur_bet, policies[1], passed, starting_player)
+        (action, phase) = choose_model_action(player_state, phase, cur_bet, starting_player)
     end
 
     (game_state, phase, cur_bet, passed, result) = simulate_to_next_turn(game_state, action, policies, starting_player, phase, cur_bet, passed)
@@ -326,8 +321,7 @@ function simulate_round(num_players, starting_player, policies, filename)
     while result == 0 # non-zero result means someone has won
         player_state = game_state_to_player_state(game_state, 1)
         if passed[1] == 0
-            #(action, phase) = choose_model_action(player_state, phase, cur_bet, 1)
-            (action, phase) = choose_action(player_state, phase, cur_bet, policies[1], passed, 1)
+            (action, phase) = choose_model_action(player_state, phase, cur_bet, 1)
         else
             action = 0
         end
@@ -345,25 +339,19 @@ function simulate_round(num_players, starting_player, policies, filename)
     return reward
 end
 
-filename = ("test.txt")
+filename = ("100000_rounds.txt")
 
 num_players = 4
 starting_player = 1
 policies = [1 0 1 2] # random, aggressive, random, flower
 
-# for i in 1:100000
-#     for j in 1:4
-#         policies[j] = rand(0:2)
-#     end
-#     starting_player = rand(1:4)
-#     simulate_round(num_players, starting_player, policies, filename)
-# end
+#a beta distribution to keep track of what we flip of others
+beta_flips = [1 for r in 1:num_players, c in 1:2]
 
-reward_sum = 0
-for i in 1:100
+for i in 1:100000
+    for j in 1:4
+        policies[j] = rand(0:2)
+    end
     starting_player = rand(1:4)
-    reward = simulate_round(num_players, starting_player, policies, filename)
-    global reward_sum += reward
+    simulate_round(num_players, starting_player, policies, filename, beta_flips)
 end
-
-@printf("Final reward is %d\n", reward_sum)
