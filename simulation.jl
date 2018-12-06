@@ -345,13 +345,30 @@ num_players = 4
 starting_player = 1
 policies = [1 0 1 2] # random, aggressive, random, flower
 
+<<<<<<< HEAD
 #a beta distribution to keep track of what we flip of others
 beta_flips = [1 for r in 1:num_players, c in 1:2]
+=======
+#creating a beta distribution for each player, with a prior of 1,1
+beta_flips = [1 for r in 1:num_players, c in 1:2]
+# for i in 1:100000
+#     for j in 1:4
+#         policies[j] = rand(0:2)
+#     end
+#     starting_player = rand(1:4)
+#     simulate_round(num_players, starting_player, policies, filename)
+# end
+>>>>>>> old-project-state
 
 for i in 1:100000
     for j in 1:4
         policies[j] = rand(0:2)
     end
     starting_player = rand(1:4)
+<<<<<<< HEAD
     simulate_round(num_players, starting_player, policies, filename, beta_flips)
+=======
+    reward = simulate_round(num_players, starting_player, policies, filename, beta_flips)
+    global reward_sum += reward
+>>>>>>> old-project-state
 end
