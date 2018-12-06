@@ -351,6 +351,8 @@ num_players = 4
 starting_player = 1
 policies = [1 0 1 2] # random, aggressive, random, flower
 
+#creating a beta distribution for each player, with a prior of 1,1
+beta_flips = [1 for r in 1:num_players, c in 1:2]
 # for i in 1:100000
 #     for j in 1:4
 #         policies[j] = rand(0:2)
