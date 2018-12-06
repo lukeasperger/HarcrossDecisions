@@ -51,14 +51,15 @@ function choose_action(player_state, phase, cur_bet, policy, passed, cur_player)
     actions 3-14: place a bet of action - 2 (ie action 3 is betting 1)
     action 15: pass
     """
-
+    #@printf("phase is %d, curbet is %d, player state is %d\n", phase, cur_bet, player_state)
     if phase == 1 # playing phase: actions 1-14 are valid
         # note - we could alternatively just select from 3 actions if that's
         # easier
         #15 actions sound good. but we need to know how to transition from playing to betting
+        #@printf("action is %d\n", action)
         action = choose_playing_action(player_state, policy)
-        if action > 2 # if player decides to flip
-            phase = 2 # move to flipping phase
+        if action > 2 # if player decides to bet
+            phase = 2 # move to betting phase
             @printf("Player %d bets %d\n", cur_player, action - 2)
         end
     elseif phase == 2 # betting phase: actions 3-15 are valid
@@ -79,8 +80,8 @@ end
 
 function process_json()
     #JSON.jl is trash so i had to process this json string manually :(
-    
-    data=JSON.parsefile("skull_Q.json")  
+
+    data=JSON.parsefile("skull_Q.json")
     data = data[3:end-1]
     d = split(data, """,\"""" )
     values = []
@@ -95,7 +96,7 @@ function process_json()
         value = parse(Float64,value)
         dict[sa_pair] = value
     end
-    return dict  
+    return dict
 end
 
 
@@ -103,40 +104,43 @@ function choose_model_action(player_state, phase, cur_bet, cur_player)
      """
     Chooses action based on optimal policies learned in Value Iteration that
     are contained in Skull_Q.json
-    
+
     action 1: place flower
     action 2: place skull
     actions 3-14: place a bet of action - 2 (ie action 3 is betting 1)
     action 15: pass
     """
     dict = process_json()
-    max = -10 #impossible to go below, used as initial threshold for action selection 
+    max = -10 #impossible to go below, used as initial threshold for action selection
     if phase == 1 # playing phase: actions 1-14 are valid
         # note - we could alternatively just select from 3 actions if that's
         # easier
         #15 actions sound good. but we need to know how to transition from playing to betting
         #action = choose_playing_action(player_state, policy)
-        for key in dict.keys()
+        action = 3 # default if nothing better
+        for key in keys(dict)
             if player_state in key
                 if key[1] < 15 && dict[key] > max
                     max = dict[key]
                     action = key[1]
                 end
             end
-        end 
-        if action > 2 # if player decides to flip
-            phase = 2 # move to flipping phase
+        end
+        if action > 2 # if player decides to bet
+            phase = 2 # move to betting phase
             @printf("Player %d bets %d\n", cur_player, action - 2)
         end
     elseif phase == 2 # betting phase: actions 3-15 are valid
-        for key in dict.keys()
+        #@printf("phase = 2\n")
+        action = 15 # default to passing if nothing better
+        for key in keys(dict)
             if player_state in key
                 if key[1] > 3 && key[1] < 16 && dict[key] > max
                     max = dict[key]
                     action = key[1]
                 end
             end
-        end 
+        end
         if action != 15
             @printf("Player %d bets %d\n", cur_player, action - 2)
         else
@@ -148,8 +152,8 @@ function choose_model_action(player_state, phase, cur_bet, cur_player)
         # will need to add some way of knowing which cards are left
     end
     return (action, phase)
-end 
-    
+end
+
 function update_game_state(game_state, action, cur_turn)
     """
     Takes in a game_state, player and action and returns the new game_state
@@ -305,7 +309,8 @@ function simulate_round(num_players, starting_player, policies, filename)
     if starting_player != 1
         action = 0 # don't choose action yet if oppenent is going first
     else
-        (action, phase) = choose_model_action(player_state, phase, cur_bet, starting_player)
+        #(action, phase) = choose_model_action(player_state, phase, cur_bet, starting_player)
+        (action, phase) = choose_action(player_state, phase, cur_bet, policies[1], passed, starting_player)
     end
 
     (game_state, phase, cur_bet, passed, result) = simulate_to_next_turn(game_state, action, policies, starting_player, phase, cur_bet, passed)
@@ -321,7 +326,8 @@ function simulate_round(num_players, starting_player, policies, filename)
     while result == 0 # non-zero result means someone has won
         player_state = game_state_to_player_state(game_state, 1)
         if passed[1] == 0
-            (action, phase) = choose_model_action(player_state, phase, cur_bet, 1)
+            #(action, phase) = choose_model_action(player_state, phase, cur_bet, 1)
+            (action, phase) = choose_action(player_state, phase, cur_bet, policies[1], passed, 1)
         else
             action = 0
         end
@@ -339,16 +345,25 @@ function simulate_round(num_players, starting_player, policies, filename)
     return reward
 end
 
-filename = ("100000_rounds.txt")
+filename = ("test.txt")
 
 num_players = 4
 starting_player = 1
 policies = [1 0 1 2] # random, aggressive, random, flower
 
-for i in 1:100000
-    for j in 1:4
-        policies[j] = rand(0:2)
-    end
+# for i in 1:100000
+#     for j in 1:4
+#         policies[j] = rand(0:2)
+#     end
+#     starting_player = rand(1:4)
+#     simulate_round(num_players, starting_player, policies, filename)
+# end
+
+reward_sum = 0
+for i in 1:100
     starting_player = rand(1:4)
-    simulate_round(num_players, starting_player, policies, filename)
+    reward = simulate_round(num_players, starting_player, policies, filename)
+    global reward_sum += reward
 end
+
+@printf("Final reward is %d\n", reward_sum)

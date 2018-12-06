@@ -31,7 +31,7 @@ function choose_playing_action(player_state, policy)
     end
 end
 
-function choose_betting_action(player_state, cur_bet, policy)
+function choose_betting_action(player_state, cur_bet)
     #2 optons: pass or increase
     # There are two main reasons a player would want to pass.
     # They have laid down a skull so they **know** they can't be successful
@@ -54,7 +54,13 @@ function choose_betting_action(player_state, cur_bet, policy)
     #so like if that number is 3 and the bet is at 3 we wouldn't want to increase
 
     # add in check so we don't bet more than number of cards
-    num_cards_on_board = opp_state + findlast(!isequal(0), cards)
+    @printf("opp state is %d\n", opp_state)
+    @printf("cards are %d, %d, %d, %d\n", cards[1], cards[2], cards[3], cards[4])
+    our_cards = findlast(!isequal(0), cards)
+    if iszero(cards)
+        our_cards = 0
+    end
+    num_cards_on_board = opp_state + our_cards
     if cur_bet >= num_cards_on_board
         return 13
     end
