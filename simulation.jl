@@ -226,11 +226,11 @@ function flip_cards(game_state, cur_turn, cur_bet, beta_flips)
             board_state[player_to_flip, ind] = 0
             beta_flips[player_to_flip, 2] +=1
             @printf("Player %d flips over player %d's skull\n", cur_turn, player_to_flip)
-            return -1 * cur_turn
+            return -1 * cur_turn, beta_flips
         end
     end
 
-    return cur_turn
+    return cur_turn, beta_flips
 end
 
 function simulate_to_next_turn(game_state, action, policies, starting_player, phase, cur_bet, passed, beta_flips)
@@ -259,11 +259,12 @@ function simulate_to_next_turn(game_state, action, policies, starting_player, ph
             #if result is +, then the player scores,
             #if result is -, then the player was not successful.
             @printf("%d players have passed, player %d is flipping\n", sum(passed), cur_turn)
-            result = flip_cards(game_state, cur_turn, cur_bet, beta_flips)
+            result, beta_flips = flip_cards(game_state, cur_turn, cur_bet, beta_flips)
             break
         end
         player_state = game_state_to_player_state(game_state, cur_turn)
         if cur_turn != 1
+            #(action, phase) = choose_model_action(player_state, phase, cur_bet, starting_player)
             (action, phase) = choose_action(player_state, phase, cur_bet, policies[cur_turn], passed, cur_turn)
         end
         if action == 1 || action == 2 # card-playing actions
@@ -280,7 +281,7 @@ function simulate_to_next_turn(game_state, action, policies, starting_player, ph
         cur_turn += 1
     end
 
-    return (game_state, phase, cur_bet, passed, result)
+    return (game_state, phase, cur_bet, passed, result, beta_flips)
 end
 
 function result_to_reward(result)
@@ -319,11 +320,11 @@ function simulate_round(num_players, starting_player, policies, filename, beta_f
     if starting_player != 1
         action = 0 # don't choose action yet if oppenent is going first
     else
-        #(action, phase) = choose_model_action(player_state, phase, cur_bet, starting_player)
-        (action, phase) = choose_action(player_state, phase, cur_bet, policies[1], passed, starting_player)
+        (action, phase) = choose_model_action(player_state, phase, cur_bet, starting_player)
+        #(action, phase) = choose_action(player_state, phase, cur_bet, policies[1], passed, starting_player)
     end
 
-    (game_state, phase, cur_bet, passed, result) = simulate_to_next_turn(game_state, action, policies, starting_player, phase, cur_bet, passed, beta_flips)
+    (game_state, phase, cur_bet, passed, result, beta_flips) = simulate_to_next_turn(game_state, action, policies, starting_player, phase, cur_bet, passed, beta_flips)
 
     # record whatever we need for model (ie. state, reward, transition)
     next_player_state = game_state_to_player_state(game_state, 1)
@@ -336,12 +337,12 @@ function simulate_round(num_players, starting_player, policies, filename, beta_f
     while result == 0 # non-zero result means someone has won
         player_state = game_state_to_player_state(game_state, 1)
         if passed[1] == 0
-            #(action, phase) = choose_model_action(player_state, phase, cur_bet, 1)
-            (action, phase) = choose_action(player_state, phase, cur_bet, policies[1], passed, 1)
+            (action, phase) = choose_model_action(player_state, phase, cur_bet, 1)
+            #(action, phase) = choose_action(player_state, phase, cur_bet, policies[1], passed, 1)
         else
             action = 0
         end
-        (game_state, phase, cur_bet, passed, result) = simulate_to_next_turn(game_state, action, policies, 1, phase, cur_bet, passed, beta_flips)
+        (game_state, phase, cur_bet, passed, result, beta_flips) = simulate_to_next_turn(game_state, action, policies, 1, phase, cur_bet, passed, beta_flips)
 
         # record whatever we need for model (ie. state, reward, transition)
         next_player_state = game_state_to_player_state(game_state, 1)
@@ -352,15 +353,36 @@ function simulate_round(num_players, starting_player, policies, filename, beta_f
     end
 
     @printf("Player 1's reward is %d\n\n", reward)
-    return reward
+    return reward, beta_flips
 end
 
 filename = ("test.txt")
 
 num_players = 4
-starting_player = 1
-policies = [1 0 1 2] # random, aggressive, random, flower
-beta_flips = [1 for r in 1:4, c in 1:2]
+starting_player = 1     #BASELINE DATA
+#policies = [1 0 1 2] # random, aggressive, random, flower, - 41
+                    # rewards with beta flips:[-101, -88, -60, -38, -92, -97, -40, -68, -81, -60]
+                    # rewards without beta flips: [-117, -140, -141, -82, -82, -129, -142, -142, -83, -143]
+#policies = [1 2 2 2] # rewards with beta flips: [-202, -175, -175, -170, -211, -157, -175, -184, -175, -245]
+                    # rewards without beta flips: [-116, -166, -175, -103, -256, -155, -202, -175, -148, -157]
+
+#policies = [1 0 0 0] # rewards with beta flips: [-104, -121, -73, -58, -42, -86, -95, -82, -36, -112]
+                    # rewards without beta flips: [-100, -30, -19, -86, -60, -105, -13, -94, -72, 36]
+#policies = [1 1 1 1] # rewards with beta flips: [16, -64, -60, -73, -45, -44, -50, -5, -38, -34]
+                    # rewards without beta flips:[-85, -66, -58, -60, -45, -71, -25, -96, -43, 26]
+
+                    #RL data`
+#policies 1 w/ beta flips: reards are [57, 6, 3, 58, 52, 49, 23, 71, 27, 1]
+#policies 1 w/o beta flips: rewards are [-7, -22, -5, -7, 72, 44, 37, -66, 62, -45]
+#policies 2 w/ beta flips: rewards are [-220, -211, -211, -184, -193, -202, -148, -202, -211, -184]
+#policies 2 w/o beta flips: rewards are [-94, -211, -148, -166, -202, -193, -211, -184, -148, -229]
+#policies 3 w/ beta flips: rewards are [-116, -151, -116, -78, -67, -98, -86, -132, -22, -78]
+#policies 3 w/o beta flips: rewards are [-132, -103, -168, -130, -115, -79, -55, -120, -113, -75]
+#policies 4 w/ beta flips: rewards are [-23, 33, 4, 2, -17, -12, 8, 14, -21, -27]
+#policies 4 w/o beta flips: rewards are [35, -29, 12, -4, 26, 3, -36, 33, -19, 17]
+
+
+
 # for i in 1:100000
 #     for j in 1:4
 #         policies[j] = rand(0:2)
@@ -369,11 +391,16 @@ beta_flips = [1 for r in 1:4, c in 1:2]
 #     simulate_round(num_players, starting_player, policies, filename)
 # end
 
-reward_sum = 0
-for i in 1:100
-    starting_player = rand(1:4)
-    reward = simulate_round(num_players, starting_player, policies, filename, beta_flips)
-    global reward_sum += reward
+rewards = collect(1:10)
+for j in 1:10
+    reward_sum = 0
+    beta_flips = [1 for r in 1:4, c in 1:2]
+    for i in 1:100
+        starting_player = rand(1:4)
+        reward, beta_flips = simulate_round(num_players, starting_player, policies, filename, beta_flips)
+        reward_sum += reward
+    end
+    rewards[j] = reward_sum
 end
-
-@printf("Final reward is %d\n", reward_sum)
+print("rewards are ", rewards)
+#@printf("Final reward is %d\n", reward_sum)
